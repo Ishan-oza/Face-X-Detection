@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#07090C" />
+    <meta
+      name="description"
+      content="Face-X Detection — an AI-based image authenticity and deepfake analysis system for still images."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Face-X Detection" />
+    <meta
+      property="og:description"
+      content="AI-based image authenticity and deepfake analysis for still images."
+    />
+    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="/brand/facex-logo.png" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="preload" as="image" href="/brand/facex-mark.png" />
+    <link rel="preload" as="image" href="/brand/facex-wordmark.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap"
+    />
+    <title>Face-X Detection</title>
+    <style>
+      /* Branded loading screen, shown until the app mounts and replaces #root's contents. */
+      html, body { background: #07090c; margin: 0; }
+      .boot { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; }
+      .boot img { width: 72px; height: auto; animation: boot-pulse 1.6s ease-in-out infinite; }
+      .boot span { font: 500 10px/1 ui-monospace, monospace; letter-spacing: 0.24em; color: #8e97a6; text-transform: uppercase; }
+      @keyframes boot-pulse { 0%, 100% { opacity: 0.55; transform: scale(0.97); } 50% { opacity: 1; transform: scale(1); } }
+      @media (prefers-reduced-motion: reduce) { .boot img { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div class="boot" role="status" aria-label="Loading Face-X Detection">
+        <img src="/brand/facex-mark.png" alt="" width="429" height="388" />
+        <span>Loading</span>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

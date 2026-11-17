@@ -1,176 +1,344 @@
-"""VeriStream Forensic Report Web UI. Run with: streamlit run app.py"""
+"""
+VeriStream FastAPI Backend
+
+Run:
+    uvicorn app:app --host 127.0.0.1 --port 8001 --reload
+"""
+
 import os
-import json
+import shutil
 import tempfile
+import time
 from pathlib import Path
-import streamlit as st
+from typing import Optional
+
+from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+
 from veristream import VeriStream, Config
-from veristream.gemini_engine import validate_gemini_key
-
-st.set_page_config(page_title="VeriStream Forensic Engine", layout="wide")
-
-if "gemini_authenticated" not in st.session_state:
-    st.session_state.gemini_authenticated = False
-if "gemini_api_key" not in st.session_state:
-    st.session_state.gemini_api_key = ""
 
 
-@st.cache_resource
-def get_engine(use_fg: bool, margin: float):
-    cfg = Config(use_faceguard=use_fg, face_margin=margin)
-    return VeriStream(cfg)
+# ============================================================
+# APP CONFIG
+# ============================================================
+
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "veristream_output"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+app = FastAPI(
+    title="Face-X Detection — VeriStream Forensic API",
+    description="Multi-stream AI-generated image and deepfake forensic analysis API",
+    version="1.0.0",
+)
+
+# React/Vite frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Generated forensic images
+app.mount(
+    "/outputs",
+    StaticFiles(directory=str(OUTPUT_DIR)),
+    name="outputs",
+)
 
 
-# =====================================================================
-# PAGE 1: WELCOME & GEMINI API KEY GATE
-# =====================================================================
-if not st.session_state.gemini_authenticated:
-    st.title("Welcome to VeriStream Forensic Engine")
-    st.markdown(
-        """
-        **VeriStream** is a multi-stream deepfake and AI-image forensic system.
-        To generate human-readable forensic explanations, please enter your free **Google AI Studio Gemini API Key** below.
-        """
-    )
+# ============================================================
+# SINGLE VERISTREAM ENGINE
+# ============================================================
 
-    with st.form("api_key_form"):
-        user_key = st.text_input(
-            "Enter your Gemini API Key",
-            type="password",
-            placeholder="AIzaSy...",
-            help="Get a free API key from https://aistudio.google.com/app/apikey",
+_engine: Optional[VeriStream] = None
+
+
+def get_engine() -> VeriStream:
+    """
+    Create VeriStream only once.
+
+    This is important because the models are expensive to initialize.
+    Subsequent requests reuse the same loaded models.
+    """
+    global _engine
+
+    if _engine is None:
+        print("\n" + "=" * 60)
+        print("INITIALIZING VERISTREAM FORENSIC ENGINE")
+        print("=" * 60)
+
+        cfg = Config(
+            use_faceguard=False,
+            face_margin=0.50,
         )
-        submitted = st.form_submit_button("Verify & Continue to Testing Page")
 
-        if submitted:
-            with st.spinner("Verifying your Gemini API key with Google AI Studio..."):
-                is_valid, msg = validate_gemini_key(user_key)
-            if is_valid:
-                clean_k = user_key.strip()
-                os.environ["GEMINI_API_KEY"] = clean_k
-                st.session_state.gemini_api_key = clean_k
-                st.session_state.gemini_authenticated = True
-                st.success(msg)
-                st.rerun()
-            else:
-                st.error(f"❌ Verification Failed!\n\n{msg}")
+        _engine = VeriStream(cfg)
 
-    st.stop()
+        print("=" * 60)
+        print("VERISTREAM ENGINE READY")
+        print("=" * 60 + "\n")
+
+    return _engine
 
 
-# =====================================================================
-# PAGE 2: MAIN FORENSIC TESTING DASHBOARD
-# =====================================================================
-os.environ["GEMINI_API_KEY"] = st.session_state.gemini_api_key
+# ============================================================
+# HEALTH
+# ============================================================
 
-st.title("VeriStream: Dual-Stream Deepfake Forensic Engine")
+@app.get("/api/health")
+async def health():
+    return {
+        "status": "ok",
+        "service": "Face-X Detection / VeriStream",
+        "device": str(get_engine().cfg.__dict__.get("device", "")),
+        "models_ready": True,
+    }
 
-with st.sidebar:
-    st.success("✔ Gemini API Key Active")
-    if st.button("Change API Key / Log Out"):
-        st.session_state.gemini_authenticated = False
-        st.session_state.gemini_api_key = ""
-        os.environ.pop("GEMINI_API_KEY", None)
-        st.rerun()
 
-    st.divider()
-    st.header("Pipeline Controls")
-    use_g = st.checkbox("Use Layer 5 Gemini Forensic Engine", value=True)
-    use_fg = st.checkbox("Deep Faceguard Available? (Skin Texture vs Face X-ray)", value=False)
-    margin = st.slider("MTCNN Face Crop Margin (CrossViT Scale)", 0.10, 0.80, 0.50, 0.05)
+# ============================================================
+# MODELS
+# ============================================================
 
-up = st.file_uploader("Upload a static image for forensic adjudication", type=["jpg", "jpeg", "png", "webp"])
+@app.get("/api/models")
+async def models():
+    engine = get_engine()
 
-if up:
-    tmp = Path(tempfile.mkdtemp()) / up.name
-    tmp.write_bytes(up.getvalue())
-
-    engine = get_engine(use_fg, margin)
-    with st.spinner("Executing Layer 0 -> Layer 5 Forensic Streams & Mapping FaceMesh Red Zones..."):
-        rep, vis = engine.analyze(tmp, use_gemini=use_g)
-
-    if rep.get("module_warnings"):
-        for mod, msg in rep["module_warnings"].items():
-            st.warning(f"Module `{mod}` warning: {msg}")
-
-    color = {
-        "DEEPFAKE_DETECTED": "red",
-        "AI_GENERATED_PROVENANCE_MARKER": "red",
-        "SUSPICIOUS_MANIPULATION": "orange",
-    }.get(rep["verdict"], "green")
-
-    c1, c2 = st.columns([1, 2])
-    c1.image(up, caption=f"Uploaded: {up.name}", use_container_width=True)
-    if "face_crop" in vis:
-        c1.image(vis["face_crop"], caption=f"MTCNN Routed Face (Margin={margin})", width=220)
-
-    c2.markdown(f"## Verdict: :{color}[{rep['verdict']}]")
-    m1, m2, m3 = c2.columns(3)
-    m1.metric("Manipulation Probability", rep["confidence_percentage"])
-    m2.metric("Human Face Routed", "Yes" if rep["router"]["human_present"] else "No")
-    m3.metric("Execution Time", f"{rep['runtime_sec']}s")
-    c2.progress(min(max(float(rep["manipulation_probability"]), 0.0), 1.0))
-
-    # --- FACEMESH RED-ZONE ANATOMICAL CALLOUT ---
-    rz = rep.get("local_stream", {}).get("facemesh_red_zones", {})
-    if rz and (rz.get("local_red_parts") or rz.get("global_red_parts")):
-        c2.markdown("### 🎯 FaceMesh Heatmap Red-Zone Pinpoint")
-        rz_cols = c2.columns(2)
-        if rz.get("local_red_parts"):
-            rz_cols[0].warning("**Local Face (CrossViT) Red Zones:**\n- " + "\n- ".join(rz["local_red_parts"]))
-        if rz.get("global_red_parts"):
-            rz_cols[1].warning("**Global Scene (Swin V2) Red Zones:**\n- " + "\n- ".join(rz["global_red_parts"]))
-
-    n = rep.get("forensic_narrative", {})
-
-    # --- NON-TECHNICAL HUMAN-READABLE EXPLANATION ---
-    c2.markdown("### What Does This Mean? (Plain-English Explanation)")
-    plain_text = n.get("plain_english_explanation") or n.get("summary", "")
-    c2.info(plain_text)
-
-    # --- TECHNICAL EXECUTIVE SUMMARY ---
-    with c2.expander("View Technical Forensic Details & Evidence", expanded=True):
-        if n.get("summary") and n.get("summary") != plain_text:
-            st.markdown(f"**Technical Summary:** {n.get('summary')}")
-        for k in ("key_evidence", "visual_observations", "limitations"):
-            if n.get(k):
-                st.markdown(f"**{k.replace('_', ' ').title()}**\n" + "\n".join(f"- {x}" for x in n[k]))
-
-    st.subheader("Layer 4: Late Fusion Signal Breakdown")
-    st.dataframe(
-        [
+    return {
+        "models": [
             {
-                "Stream": e["stream"].upper(),
-                "Forensic Module": e["name"],
-                "Normalized Score (0=Real, 1=Fake)": round(e["score"], 3),
-                "Telemetry Note": e["note"],
-            }
-            for e in rep["evidence"]
-        ],
-        use_container_width=True,
-    )
+                "id": "veristream",
+                "name": "VeriStream Forensic Engine",
+                "architecture": "Multi-stream forensic fusion",
+                "status": "ready",
+                "is_default": True,
+                "note": "Runs all available forensic streams in one analysis.",
+            },
+            {
+                "id": "swin_v2",
+                "name": "Swin V2",
+                "architecture": "Swin Transformer V2",
+                "status": "ready",
+            },
+            {
+                "id": "crossvit",
+                "name": "Cross-ViT",
+                "architecture": "CrossViT Tiny 240",
+                "status": "ready",
+            },
+            {
+                "id": "srm",
+                "name": "SRM",
+                "architecture": "Spatial Rich Model High-Pass Filter",
+                "status": "ready",
+            },
+            {
+                "id": "depth_anything_v2",
+                "name": "Depth Anything V2",
+                "architecture": "Depth estimation",
+                "status": "ready",
+            },
+            {
+                "id": "mediapipe",
+                "name": "MediaPipe Forensic Analysis",
+                "architecture": "FaceMesh + Pose + EAR",
+                "status": "ready",
+            },
+            {
+                "id": "fft",
+                "name": "FFT Spectral Analysis",
+                "architecture": "Frequency-domain analysis",
+                "status": "ready",
+            },
+            {
+                "id": "face_xray",
+                "name": "Face X-ray",
+                "architecture": "Boundary blending analysis",
+                "status": "ready",
+            },
+        ]
+    }
 
-    st.subheader("Decoupled Forensic Heatmaps & Overlays")
-    map_keys = [
-        k for k in (
-            "swin_gar", "crossvit_gar", "mesh_gar_overlay",
-            "srm_residual", "xray_map", "fft_spectrum", "depth_map", "pose", "face_mesh"
-        ) if k in vis
-    ]
-    if map_keys:
-        cols = st.columns(min(len(map_keys), 4))
-        for idx, k in enumerate(map_keys):
-            cols[idx % len(cols)].image(vis[k], caption=k.replace("_", " ").upper(), use_container_width=True)
 
-    if rep.get("gemini_error"):
-        st.warning(rep["gemini_error"])
+# ============================================================
+# ANALYZE IMAGE
+# ============================================================
 
-    with st.expander("Inspect Raw Telemetry Packet (JSON)"):
-        st.json(rep)
+@app.post("/api/analyze")
+async def analyze_image(
+    file: UploadFile = File(...),
+    use_gemini: bool = True,
+    gemini_api_key: Optional[str] = None,
+):
+    """
+    Run the complete VeriStream forensic pipeline.
 
-    st.download_button(
-        "Download Final Forensic Report (JSON)",
-        json.dumps(rep, indent=2, default=str),
-        file_name=f"veristream_{Path(up.name).stem}_report.json",
-        mime="application/json",
-    )
+    One request executes:
+      Metadata
+      Router
+      Swin V2
+      Depth Anything V2
+      Pose / Anatomy
+      SRM
+      CrossViT
+      FaceMesh / EAR
+      GAR
+      FFT
+      Face X-ray
+      Gemini forensic narrative
+      Late fusion
+    """
+
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="No filename supplied.",
+        )
+
+    allowed_extensions = {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp",
+        ".bmp",
+        ".tif",
+        ".tiff",
+    }
+
+    extension = Path(file.filename).suffix.lower()
+
+    if extension not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Unsupported image format. "
+                "Supported formats: JPG, JPEG, PNG, WEBP, BMP, TIFF."
+            ),
+        )
+
+    # --------------------------------------------------------
+    # Save uploaded image temporarily
+    # --------------------------------------------------------
+
+    temp_path = None
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=extension,
+        ) as temp_file:
+
+            temp_path = Path(temp_file.name)
+
+            shutil.copyfileobj(
+                file.file,
+                temp_file,
+            )
+
+        print("\n" + "=" * 60)
+        print(f"ANALYZING IMAGE: {file.filename}")
+        print("=" * 60)
+
+        start_time = time.time()
+
+        if gemini_api_key and gemini_api_key.strip():
+            os.environ["GEMINI_API_KEY"] = gemini_api_key.strip()
+
+        # ----------------------------------------------------
+        # Run complete VeriStream pipeline
+        # ----------------------------------------------------
+
+        engine = get_engine()
+
+        report, _visualizations = engine.analyze(
+            temp_path,
+            save=True,
+            use_gemini=use_gemini,
+        )
+
+        api_runtime = round(time.time() - start_time, 2)
+
+        # ----------------------------------------------------
+        # Build public visualization URLs
+        # ----------------------------------------------------
+
+        output_dir = report.get("output_dir")
+
+        visualization_urls = {}
+
+        if output_dir:
+            output_path = Path(output_dir)
+
+            if output_path.exists():
+                for image_path in output_path.glob("*.png"):
+                    visualization_urls[
+                        image_path.stem
+                    ] = f"/outputs/{output_path.name}/{image_path.name}"
+
+        # ----------------------------------------------------
+        # Add API metadata
+        # ----------------------------------------------------
+
+        report["api_runtime_sec"] = api_runtime
+        report["original_filename"] = file.filename
+        report["visualizations"] = visualization_urls
+
+        print("=" * 60)
+        print(
+            f"ANALYSIS COMPLETE: "
+            f"{report.get('verdict', 'UNKNOWN')}"
+        )
+        print(
+            f"Manipulation probability: "
+            f"{report.get('manipulation_probability', 0)}"
+        )
+        print(
+            f"Pipeline runtime: "
+            f"{report.get('runtime_sec', api_runtime)} sec"
+        )
+        print("=" * 60 + "\n")
+
+        return {
+            "success": True,
+            "report": report,
+            "visualizations": visualization_urls,
+        }
+
+    except Exception as e:
+        print("\n[API ERROR]")
+        print(f"{type(e).__name__}: {e}")
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"VeriStream analysis failed: {type(e).__name__}: {e}",
+        )
+
+    finally:
+        # Remove temporary uploaded file.
+        if temp_path and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except Exception:
+                pass
+
+
+# ============================================================
+# ROOT
+# ============================================================
+
+@app.get("/")
+async def root():
+    return {
+        "service": "Face-X Detection",
+        "engine": "VeriStream",
+        "status": "running",
+        "docs": "/docs",
+    }

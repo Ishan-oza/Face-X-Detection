@@ -1,10 +1,93 @@
-__pycache__/
+# =====================================================================
+# Dependencies & Package Managers
+# =====================================================================
+node_modules/
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =====================================================================
+# Build & Distribution Artifacts
+# =====================================================================
+dist/
+.dist/
+frontend/dist/
+build/
+*.egg-info/
+.eggs/
+*.tsbuildinfo
+.vite/
+frontend/.vite/
+
+# =====================================================================
+# Python & Virtual Environments
+# =====================================================================
+.venv/
+venv/
+env/
+ENV/
 *.py[cod]
+*$py.class
+__pycache__/
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# =====================================================================
+# Model Checkpoints & Large Binary Task Files
+# =====================================================================
 *.pth
 *.pt
 *.ckpt
+*.task
+*.onnx
+*.bin
+*.safetensors
+*.h5
 models/
+
+# =====================================================================
+# Generated Analysis Outputs & Logs
+# =====================================================================
 veristream_output/
+*.log
+
+# =====================================================================
+# Local Environment & Secrets (Keep .env.example tracked)
+# =====================================================================
+.env
+.env.*
+!.env.example
+!frontend/.env.example
+
+# =====================================================================
+# IDEs & Editor Files
+# =====================================================================
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# =====================================================================
+# OS Temporary Files
+# =====================================================================
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+desktop.ini
+
+# =====================================================================
+# Notebook Checkpoints
+# =====================================================================
+.ipynb_checkpoints/

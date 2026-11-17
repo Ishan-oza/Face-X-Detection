@@ -1,0 +1,21 @@
+{
+  "name": "Face-X Detection",
+  "short_name": "Face-X",
+  "description": "AI-based image authenticity and deepfake analysis for still images.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07090C",
+  "theme_color": "#07090C",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
