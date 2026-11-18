@@ -34,15 +34,13 @@ app = FastAPI(
 )
 
 # React/Vite frontend
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "*").strip()
+_origins = ["*"] if _raw_origins == "*" else [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
-    allow_credentials=True,
+    allow_origins=_origins,
+    allow_credentials=False if _origins == ["*"] else True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

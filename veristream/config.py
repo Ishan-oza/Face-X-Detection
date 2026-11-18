@@ -1,4 +1,4 @@
-"""Configuration, thresholds, fusion weights, and MediaPipe asset downloader."""
+"""Configuration, thresholds, fusion weights, and cloud asset downloader."""
 import os
 import urllib.request
 import warnings
@@ -18,17 +18,29 @@ logging.getLogger("exifread").setLevel(logging.ERROR)
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 IMNET = transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 
+HF_WEIGHTS_BASE = os.getenv(
+    "VS_HF_WEIGHTS_URL",
+    "https://huggingface.co/ishanoza666/face-x-detection-weights/resolve/main",
+)
+
 MP_URLS = {
     "pose_landmarker_heavy.task": "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/1/pose_landmarker_heavy.task",
     "face_landmarker.task": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
 }
 
 
-def _find_file(candidates: List[Path]) -> Path:
+def _find_or_download_weight(filename: str, candidates: List[Path]) -> Path:
     for p in candidates:
         if p and p.exists():
             return p.resolve()
-    return candidates[0]
+    target = Path(f"./{filename}")
+    url = f"{HF_WEIGHTS_BASE}/{filename}"
+    print(f"[VeriStream] Downloading {filename} from Hugging Face Hub...")
+    tmp = target.with_suffix(target.suffix + ".part")
+    urllib.request.urlretrieve(url, tmp)
+    tmp.rename(target)
+    print(f"[VeriStream] Downloaded {filename} ({target.stat().st_size / (1024*1024):.1f} MB)")
+    return target.resolve()
 
 
 @dataclass
@@ -40,14 +52,12 @@ class Config:
     models_dir: Path = field(default_factory=lambda: Path(os.getenv("VS_MODELS", "./models")))
     out_dir: Path = field(default_factory=lambda: Path(os.getenv("VS_OUT", "./veristream_output")))
     depth_model: str = "depth-anything/Depth-Anything-V2-Small-hf"
-    # gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
     gemini_model: str = field(default_factory=lambda: os.getenv("GEMINI_MODEL", "gemini-3.8-flash"))
 
-
     # Architecture switches & tuned parameters
-    use_faceguard: bool = False          # True -> Skin Texture branch | False -> Face X-ray branch
-    faceguard_ts: Optional[Path] = None  # Optional TorchScript skin-texture model path
-    face_margin: float = 0.50            # Tuned 0.50 margin matching CrossViT training scale
+    use_faceguard: bool = False
+    faceguard_ts: Optional[Path] = None
+    face_margin: float = 0.50
     min_face_conf: float = 0.90
 
     # Heuristic Thresholds
@@ -78,7 +88,7 @@ class Config:
         if os.getenv("VS_SWIN"):
             self.swin_ckpt = Path(os.getenv("VS_SWIN"))
         elif self.swin_ckpt is None:
-            self.swin_ckpt = _find_file([
+            self.swin_ckpt = _find_or_download_weight("swin_best.pth", [
                 Path("./swin_best.pth"),
                 sw_dir / "swin_best.pth",
                 Path("./checkpoints/swin_best.pth"),
@@ -87,7 +97,7 @@ class Config:
         if os.getenv("VS_SWIN_MAP"):
             self.swin_class_map = Path(os.getenv("VS_SWIN_MAP"))
         elif self.swin_class_map is None:
-            self.swin_class_map = _find_file([
+            self.swin_class_map = _find_or_download_weight("class_to_idx.json", [
                 Path("./class_to_idx.json"),
                 sw_dir / "class_to_idx.json",
                 Path("./checkpoints/class_to_idx.json"),
@@ -96,7 +106,7 @@ class Config:
         if os.getenv("VS_CROSSVIT"):
             self.crossvit_ckpt = Path(os.getenv("VS_CROSSVIT"))
         elif self.crossvit_ckpt is None:
-            self.crossvit_ckpt = _find_file([
+            self.crossvit_ckpt = _find_or_download_weight("crossvit_best_checkpoint.pth", [
                 Path("./crossvit_best_checkpoint.pth"),
                 self.base / "crossvit_best_checkpoint.pth",
                 Path.home() / "Downloads/crossvit_best_checkpoint.pth",
