@@ -3,6 +3,8 @@
 
 > **Can you trust what you see?** Modern generative AI and face-swap tools leave microscopic traces invisible to the naked eye—unnatural frequency patterns, depth inconsistencies, subtle jawline seams, and micro-expression asymmetries. **Face-X-Detection (VeriStream)** is a full-stack digital forensic platform that exposes synthetic manipulations, pinpoints *exactly where* the image was altered, and explains *why* in plain English.
 
+> **Note:** This project is under active development and is still getting perfected day by day—models, forensic signals, thresholds, and UI workflows are continuously being refined and improved.
+
 ---
 
 ## Table of Contents
@@ -192,6 +194,7 @@ Face-X-Detection/
 |-- class_to_idx.json               # Class label mapping for Swin V2 checkpoint
 |-- swin_best.pth                   # (Download from Drive) Swin V2 Global weights
 |-- crossvit_best_checkpoint.pth    # (Download from Drive) CrossViT Local weights
+|-- LICENSE                         # MIT License
 |-- veristream/                     # Core 6-layer modular forensic engine
 |   |-- config.py                   # Device selection, paths, thresholds & weights
 |   |-- metadata.py                 # Layer 0: EXIF & AI provenance scanner
@@ -205,4 +208,34 @@ Face-X-Detection/
     |-- src/                        # Components, pages, API services & PDF export
     |-- package.json                # Frontend dependencies & scripts
     +-- .env.example                # Backend proxy & API URL template
+```
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+```text
+MIT License
+
+Copyright (c) 2026 Oza Ishan Pankaj (@Ishan-oza), KRISHNA SJ (@Krishna17ctrl), LOCHAN P ANCHALKAR (@lochan-22), PRATHIK M B MATH (@PrathikMath)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
